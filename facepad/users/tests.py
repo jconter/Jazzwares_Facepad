@@ -61,5 +61,11 @@ class UserRegistrationAPITest(TestCase):
         self.client.post(REGISTER_USER_URL, self.user_payload)
         post_bad = self.client.post(REGISTER_USER_URL, self.copy_email_payload)
         self.assertEqual(post_bad.status_code, status.HTTP_400_BAD_REQUEST)
-        
+    
+    def test_register_regular_user(self):
+        """Testing to make sure that when a user registers they are only a regular user
+        """
+        self.client.post(REGISTER_USER_URL, self.user_payload)
+        user = self.user_model.objects.get(username=self.user_payload['username'])
+        self.assertEqual(user.user_type, 'regular') #type: ignore
         
