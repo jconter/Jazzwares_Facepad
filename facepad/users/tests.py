@@ -133,4 +133,30 @@ class GetUserInfo(TestCase):
         }
         self.client.post(REGISTER_USER_URL, self.payload_user)
         login = self.client.post(LOGIN_USER_URL, payload_login)
-        
+
+
+class CreateFriendRequest(TestCase):
+    """This is a test case to test the create friend request endpoint
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.user_model = get_user_model()
+        self.payload_user = {
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'username': 'jdoe',
+            'email': 'john.doe@gmail.com',
+            'password': 'secret',
+            'date_of_birth': '1990-02-14'
+        }
+        self.payload_friend = {
+            'first_name': 'Jane',
+            'last_name': 'Doe',
+            'username': 'jdoe2',
+            'email': 'jane.doe@gmail.com',
+            'password': 'secret',
+            'date_of_birth': '1993-02-14'
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        self.client.post(REGISTER_USER_URL, self.payload_friend)
+        login
