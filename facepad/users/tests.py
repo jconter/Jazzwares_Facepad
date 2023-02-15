@@ -1,8 +1,8 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework.test import APIClient
 
 REGISTER_USER_URL = reverse('users:register')
 LOGIN_USER_URL = reverse('users:login')
@@ -110,4 +110,27 @@ class UserLoginAPITest(TestCase):
         }
         refresh = self.client.post(REFRESH_TOKEN_URL, payload)
         self.assertTrue('access' in refresh.data) #type: ignore
+        
+        
+class GetUserInfo(TestCase):
+    """This is a test case to test the requirements for the user info get endpoint
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.user_model = get_user_model()
+        
+        self.payload_user = {
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'username': 'jdoe',
+            'email': 'john.doe@gmail.com',
+            'password': 'secret',
+            'date_of_birth': '1990-02-14'
+        }
+        payload_login = {
+            'username': 'jdoe',
+            'password': 'secret',
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        login = self.client.post(LOGIN_USER_URL, payload_login)
         
