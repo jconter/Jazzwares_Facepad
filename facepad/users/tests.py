@@ -110,15 +110,16 @@ class UserLoginAPITest(TestCase):
         }
         refresh = self.client.post(REFRESH_TOKEN_URL, payload)
         self.assertTrue('access' in refresh.data) #type: ignore
-        
-        
+
+
 class GetUserInfo(TestCase):
     """This is a test case to test the requirements for the user info get endpoint
     """
     def setUp(self):
         self.client = APIClient()
+        self.client_noauth = APIClient()
         self.user_model = get_user_model()
-        
+
         self.payload_user = {
             'first_name': 'John',
             'last_name': 'Doe',
@@ -127,10 +128,66 @@ class GetUserInfo(TestCase):
             'password': 'secret',
             'date_of_birth': '1990-02-14'
         }
+        self.payload_user_nologin = {
+            'first_name': 'Jane',
+            'last_name': 'Doe',
+            'username': 'jdoe2',
+            'email': 'jane.doe@gmail.com',
+            'password': 'secret',
+            'date_of_birth': '1993-01-21'
+        }
+        self.payload_user_friend = {
+            'first_name': 'Cool',
+            'last_name': 'Guy',
+            'username': 'cguy',
+            'email': 'cool.guy@gmail.com',
+            'password': 'secret',
+            'date_of_birth': '1993-10-21'
+        }
         payload_login = {
             'username': 'jdoe',
             'password': 'secret',
         }
         self.client.post(REGISTER_USER_URL, self.payload_user)
+        self.client.post(REGISTER_USER_URL, self.payload_user_friend)
+        self.client_noauth.post(REGISTER_USER_URL, self.payload_user_nologin)
         login = self.client.post(LOGIN_USER_URL, payload_login)
+        self.auth_token = login.data['access'] #type: ignore
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.auth_token)
+
+    def test_get_userinfo_loggedin(self):
+        """Test to make sure that you get user data when you request user data when logged in"""
         
+        get_url = reverse('users:get_user', kwargs={'username': self.payload_user['username']})
+        get_user_info = self.client.get(get_url)
+        self.assertEqual(
+            get_user_info.data['username'], #type: ignore
+            self.payload_user['username']
+            ) 
+        self.assertEqual(
+            get_user_info.data['email'], #type: ignore
+            self.payload_user['email']
+            ) 
+        self.assertEqual(
+            get_user_info.data['first_name'], #type: ignore
+            self.payload_user['first_name']
+            ) 
+        self.assertEqual(
+            get_user_info.data['last_name'], #type: ignore
+            self.payload_user['last_name']
+            )
+        self.assertEqual(
+            get_user_info.data['date_of_birth'], #type: ignore
+            self.payload_user['date_of_birth']
+            )
+
+    def test_get_userinfo_notloggedin(self):
+        """Test to make sure that you cannot get user data if you are not logged in"""
+
+        get_url = reverse(
+            'users:get_user', kwargs={'username': self.payload_user_nologin['username']})
+        get_user_info = self.client_noauth.get(get_url)
+        self.assertEqual(get_user_info.status_code, status.HTTP_401_UNAUTHORIZED) #type: ignore
+        
+    def test_get_userinfo_notselforfriend(self):
+        """Test to make sure user can only get his or his friend's data"""
