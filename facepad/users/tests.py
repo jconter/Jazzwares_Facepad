@@ -5,6 +5,8 @@ from rest_framework.test import APIClient
 from rest_framework import status
 
 REGISTER_USER_URL = reverse('users:register')
+LOGIN_USER_URL = reverse('users:login')
+REFRESH_TOKEN_URL = reverse('users:token_refresh')
 
 # Create your tests here.
 class UserRegistrationAPITest(TestCase):
@@ -68,4 +70,44 @@ class UserRegistrationAPITest(TestCase):
         self.client.post(REGISTER_USER_URL, self.user_payload)
         user = self.user_model.objects.get(username=self.user_payload['username'])
         self.assertEqual(user.user_type, 'regular') #type: ignore
+        
+        
+class UserLoginAPITest(TestCase):
+    """Test the Login API
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.user_model = get_user_model()
+        
+        payload = {
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'username': 'jdoe',
+            'email': 'john.doe@gmail.com',
+            'password': 'secret',
+            'date_of_birth': '1990-02-14'
+        }
+        self.client.post(REGISTER_USER_URL, payload)
+        
+    def test_login_returns_jwt(self):
+        payload = {
+            'username': 'jdoe',
+            'password': 'secret',
+        }
+        login = self.client.post(LOGIN_USER_URL, payload)
+        self.assertTrue('access' in login.data) #type: ignore
+        self.assertTrue('refresh' in login.data) #type: ignore
+        self.assertEqual(login.status_code, status.HTTP_200_OK)
+        
+    def test_refresh_returns_jwt(self):
+        payload_login = {
+            'username': 'jdoe',
+            'password': 'secret',
+        }
+        login = self.client.post(LOGIN_USER_URL, payload_login)
+        payload = {
+            'refresh': login.data['refresh'] #type: ignore
+        }
+        refresh = self.client.post(REFRESH_TOKEN_URL, payload)
+        self.assertTrue('access' in refresh.data) #type: ignore
         
