@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
 from users.models import FriendRequest
 
 from .serializers import FriendRequestSerializer, UserSerializer
@@ -15,6 +16,7 @@ class RegisterView(generics.CreateAPIView):
 class RequestFriend(generics.CreateAPIView):
     queryset = FriendRequest.objects.all()
     serializer_class = FriendRequestSerializer
+    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         query = (
@@ -27,3 +29,17 @@ class RequestFriend(generics.CreateAPIView):
         if query.exists():
             raise ValidationError("Friend request is still active")
         serializer.save(requestor=self.request.user)  # type: ignore
+
+
+class GetFriendRequests(generics.ListAPIView):
+    """Endpoint to get a list of active friend requests"""
+
+    queryset = FriendRequest.objects.all()
+    serializer_class = FriendRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        self.queryset = FriendRequest.objects.filter(
+            requestee=self.request.user
+        ).filter(status="active")
+        return super().get_queryset()

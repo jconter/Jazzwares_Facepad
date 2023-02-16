@@ -49,5 +49,5 @@ class FriendRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FriendRequest
-        fields = ["requestor", "requestee", "status", "created_date"]
-        read_only_fields = ["created_date"]
+        fields = ["id", "requestor", "requestee", "status", "created_date"]
+        read_only_fields = ["id", "created_date"]
