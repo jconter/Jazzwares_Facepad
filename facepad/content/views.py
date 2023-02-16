@@ -1,5 +1,5 @@
-from content.models import Content
-from content.serializers import ContentSerializer
+from content.models import Comment, Content
+from content.serializers import CommentSerializer, ContentSerializer
 from django.contrib.auth import get_user_model
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
@@ -49,4 +49,27 @@ class GetFriendContentView(generics.ListAPIView):
             return Response(
                 status=status.HTTP_404_NOT_FOUND,
                 data={"message", "user content not found"},
+            )
+
+
+class CreateCommentView(generics.CreateAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        content = Content.objects.get(title=self.kwargs.get("content"))
+        if self.kwargs.get("parent_comment"):
+            parent_comment = Comment.objects.get(
+                id=int(self.kwargs.get("parent_comment"))
+            )
+            serializer.save(
+                owner=self.request.user,
+                content=content,
+                parent_comment=[parent_comment],
+            )
+        else:
+            serializer.save(
+                owner=self.request.user,
+                content=content,
             )
