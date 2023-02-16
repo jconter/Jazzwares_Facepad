@@ -1,7 +1,8 @@
 from django.contrib.auth import get_user_model
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from users.models import FriendRequest
 
 from .serializers import (
@@ -14,17 +15,34 @@ from .serializers import (
 # Create your views here.
 class RegisterView(generics.CreateAPIView):
     """View to register a new User, only has post method"""
+
     queryset = get_user_model().objects.all()
     serializer_class = UserSerializer
 
 
 class GetUserView(generics.RetrieveAPIView):
     """View to get user info"""
-    permission_classes=[IsAuthenticated]
+
+    permission_classes = [IsAuthenticated]
     queryset = get_user_model().objects.all()
     serializer_class = UserSerializer
-    lookup_field = 'username'
-    lookup_url_kwarg = 'username'
+    lookup_field = "username"
+    lookup_url_kwarg = "username"
+
+    def get(self, request, *args, **kwargs):
+        desired_user = get_user_model().objects.get(
+            username=self.kwargs[self.lookup_url_kwarg]
+        )
+        if request.user.user_type == "admin":
+            return super().get(request, *args, **kwargs)
+        elif desired_user == self.request.user:
+            return super().get(request, *args, **kwargs)
+        elif desired_user in self.request.user.friends.all():  # type: ignore
+            return super().get(request, *args, **kwargs)
+        else:
+            return Response(
+                status=status.HTTP_404_NOT_FOUND, data={"message", "user not found"}
+            )
 
 
 class RequestFriend(generics.CreateAPIView):
