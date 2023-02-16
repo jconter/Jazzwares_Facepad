@@ -32,12 +32,12 @@ class FriendRequest(models.Model):
     requestor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="requestor",
+        related_name="sent_requests",
     )
     requestee = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="requestee",
+        related_name="requests",
     )
     status = models.CharField(max_length=8, choices=STATUS_CHOICES, default="active")
     created_date = models.DateField(default=date.today)

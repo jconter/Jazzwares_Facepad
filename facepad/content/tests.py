@@ -284,3 +284,144 @@ class ContentGetFriendAPITest(TestCase):
             get.data[0]["title"],  # type: ignore
             self.payload_content["title"],
         )
+
+
+class CreateNewCommentTest(TestCase):
+    """Test Case to test the Create New Comment Endpoint"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client_friend = APIClient()
+        self.client_other = APIClient()
+        self.create_content_url = reverse("content:content")
+        self.tmpfile = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile.name)
+        self.tmpfile2 = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile2.name)
+        self.tmpfile3 = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile3.name)
+        self.payload_content = {
+            "media": self.tmpfile,
+            "title": "Super Cool Title",
+            "description": "This is the best description in the world!",
+        }
+        self.payload_content_friend = {
+            "media": self.tmpfile2,
+            "title": "Super Cool Second Title",
+            "description": "This is the best description in the world dang!",
+        }
+        self.payload_content_other = {
+            "media": self.tmpfile3,
+            "title": "Super Cool Third Title",
+            "description": "This is the best description in the world gwow!",
+        }
+        self.payload_user = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "jdoe",
+            "email": "john.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-02-14",
+        }
+        self.payload_friend = {
+            "first_name": "Best",
+            "last_name": "Friend",
+            "username": "bfriend",
+            "email": "best.friend@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-07-14",
+        }
+        self.payload_user_other = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "username": "jdoe2",
+            "email": "jane.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1993-01-21",
+        }
+        self.payload_login = {
+            "username": "jdoe",
+            "password": "secret",
+        }
+        self.payload_login_friend = {
+            "username": "bfriend",
+            "password": "secret",
+        }
+        self.payload_login_other = {
+            "username": "jdoe2",
+            "password": "secret",
+        }
+        self.payload_comment = {
+            "text": "that was amazing content!",
+        }
+        self.payload_comment_comment = {
+            "text": "what an amazing comment!",
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        login = self.client.post(LOGIN_USER_URL, self.payload_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client_friend.post(REGISTER_USER_URL, self.payload_friend)
+        login = self.client.post(LOGIN_USER_URL, self.payload_login_friend)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_friend.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client_other.post(REGISTER_USER_URL, self.payload_user_other)
+        login = self.client_other.post(LOGIN_USER_URL, self.payload_login_other)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_other.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client.post(
+            self.create_content_url, self.payload_content, format="multipart"
+        )
+        self.client_friend.post(
+            self.create_content_url, self.payload_content_friend, format="multipart"
+        )
+        self.client_other.post(
+            self.create_content_url, self.payload_content_other, format="multipart"
+        )
+        user = get_user_model().objects.get(username="jdoe")
+        friend = get_user_model().objects.get(username="bfriend")
+        friend.friends.add(user)  # type: ignore
+
+    def test_create_comment_successfully(self):
+        """Make sure that a user can create a successful comment on a piece
+        of conent"""
+        create_comment_url = reverse(
+            "content:create_comment", kwargs={"content": self.payload_content["title"]}
+        )
+        post = self.client.post(create_comment_url, self.payload_comment, format="json")
+        self.assertEqual(post.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(post.data["text"], self.payload_comment["text"])  # type: ignore
+
+    def test_create_comment_authed(self):
+        """Make sure user is authed when making comment"""
+        self.client.credentials()  # type: ignore
+        create_comment_url = reverse(
+            "content:create_comment", kwargs={"content": self.payload_content["title"]}
+        )
+        post = self.client.post(create_comment_url, self.payload_comment, format="json")
+        self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_comment_on_comment_successfully(self):
+        """Make sure that you can successfully create a comment of a comment"""
+        create_comment_url = reverse(
+            "content:create_comment", kwargs={"content": self.payload_content["title"]}
+        )
+        post = self.client.post(create_comment_url, self.payload_comment, format="json")
+        create_comment_of_comment_url = reverse(
+            "content:create_comment_comment",
+            kwargs={
+                "content": self.payload_content["title"],
+                "parent_comment": str(post.data["id"]),  # type: ignore
+            },
+        )
+        post2 = self.client.post(
+            create_comment_of_comment_url, self.payload_comment_comment, format="json"
+        )
+        self.assertEqual(post2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            post2.data["text"], self.payload_comment_comment["text"]  # type: ignore
+        )
+        self.assertEqual(post2.data["parent_comment"][0], post.data["id"])  # type: ignore
