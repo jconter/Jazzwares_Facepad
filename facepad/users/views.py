@@ -4,7 +4,11 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from users.models import FriendRequest
 
-from .serializers import FriendRequestSerializer, UserSerializer
+from .serializers import (
+    FriendRequestResponseSerializer,
+    FriendRequestSerializer,
+    UserSerializer,
+)
 
 
 # Create your views here.
@@ -43,3 +47,28 @@ class GetFriendRequests(generics.ListAPIView):
             requestee=self.request.user
         ).filter(status="active")
         return super().get_queryset()
+
+
+class FriendRequestResponse(generics.UpdateAPIView):
+    """Endpoint to respond to a friend request"""
+
+    queryset = FriendRequest.objects.all()
+    serializer_class = FriendRequestResponseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        self.queryset = FriendRequest.objects.filter(
+            requestee=self.request.user
+        ).filter(status="active")
+        return super().get_queryset()
+
+    def perform_update(self, serializer):
+        if serializer.validated_data["status"] == "rejected":
+            serializer.save()
+        elif serializer.validated_data["status"] == "accepted":
+            fq = FriendRequest.objects.get(id=int(self.kwargs["pk"]))
+            requestor = get_user_model().objects.get(id=fq.requestor.id)
+            requestee = get_user_model().objects.get(id=fq.requestee.id)
+            requestee.friends.add(requestor)  # type: ignore
+            requestee.save()
+            serializer.save()
