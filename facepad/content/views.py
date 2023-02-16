@@ -27,6 +27,12 @@ class GetFriendContentView(generics.ListAPIView):
     lookup_field = "owner"
     lookup_url_kwarg = "owner"
 
+    def get_queryset(self):
+        self.queryset = Content.objects.filter(
+            owner__username=self.kwargs[self.lookup_url_kwarg]
+        )
+        return super().get_queryset()
+
     def get(self, request, *args, **kwargs):
         desired_user = get_user_model().objects.get(
             username=self.kwargs[self.lookup_url_kwarg]
@@ -35,8 +41,10 @@ class GetFriendContentView(generics.ListAPIView):
             return super().get(request, *args, **kwargs)
         elif desired_user == self.request.user:
             return super().get(request, *args, **kwargs)
+
         elif desired_user in self.request.user.friends.all():  # type: ignore
             return super().get(request, *args, **kwargs)
+
         else:
             return Response(
                 status=status.HTTP_404_NOT_FOUND,

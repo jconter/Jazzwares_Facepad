@@ -14,6 +14,18 @@ class Content(models.Model):
     title = models.CharField(max_length=150, unique=True)
     description = models.TextField()
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="owner"
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="content"
     )
     created_date = models.DateField(default=date.today)
+
+
+class Comment(models.Model):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="comments"
+    )
+    content = models.ForeignKey(
+        Content, on_delete=models.CASCADE, related_name="comments"
+    )
+    text = models.CharField(max_length=150)
+    created_date = models.DateField(default=date.today)
+    parent_comment = models.ManyToManyField("self", blank=True)
