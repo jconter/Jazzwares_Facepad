@@ -176,9 +176,18 @@ class CreateFriendRequest(TestCase):
     def test_create_friend_request_creates_request(self):
         """Make sure that when you send a friend request it gets created"""
         friend_request_url = reverse("users:request_friend")
-        payload = {"requestee_username": "jdoe2"}
+        payload = {"requestee": "jdoe2", "requestor": ""}
         self.client.post(friend_request_url, payload)
         fq_query = FriendRequest.objects.filter(
             requestor__username=self.payload_user["username"]
         ).filter(requestee__username=self.payload_friend["username"])
         self.assertTrue(fq_query.exists())
+
+    def test_create_friend_request_no_multiple_active(self):
+        """Make sure you cannot have two friend requests active at the same time"""
+        friend_request_url = reverse("users:request_friend")
+        friend_request_url = reverse("users:request_friend")
+        payload = {"requestee": "jdoe2", "requestor": ""}
+        self.client.post(friend_request_url, payload)
+        post = self.client.post(friend_request_url, payload)
+        self.assertEqual(post.status_code, status.HTTP_400_BAD_REQUEST)
