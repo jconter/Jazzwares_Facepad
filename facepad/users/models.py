@@ -10,7 +10,7 @@ class User(AbstractUser):
 
     USER_TYPE_CHOICES = [("regular", "Regular"), ("admin", "Admin")]
     email = models.EmailField(unique=True)
-    date_of_birth = models.DateField()
+    date_of_birth = models.DateField(default=date.today)
     friends = models.ManyToManyField("self", blank=True)
     user_type = models.CharField(
         max_length=7,
