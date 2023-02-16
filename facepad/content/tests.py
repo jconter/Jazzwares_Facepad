@@ -20,7 +20,7 @@ class ContentUploadAPITest(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.client_friend = APIClient()
-        self.create_content_url = reverse("content:create")
+        self.create_content_url = reverse("content:content")
         self.tmpfile = tempfile.NamedTemporaryFile(suffix=".jpg")
         image = Image.new("RGB", (100, 100))
         image.save(self.tmpfile.name)
@@ -62,5 +62,86 @@ class ContentUploadAPITest(TestCase):
     def test_create_content_auth(self):
         """Make sure that only authed users can create content"""
         self.client.credentials()  # type: ignore
-        post = self.client.post(self.create_content_url, self.payload_content)
+        post = self.client.post(
+            self.create_content_url, self.payload_content, format="multipart"
+        )
         self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class ContentGetAPITest(TestCase):
+    """Testing to Get method for the Content endpoint"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client_other = APIClient()
+        self.create_content_url = reverse("content:content")
+        self.tmpfile = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile.name)
+        self.tmpfile2 = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile2.name)
+        self.payload_content = {
+            "media": self.tmpfile,
+            "title": "Super Cool Title",
+            "description": "This is the best description in the world!",
+        }
+        self.payload_content_other = {
+            "media": self.tmpfile2,
+            "title": "Super Cool Second Title",
+            "description": "This is the best description in the world gwow!",
+        }
+        self.payload_user = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "jdoe",
+            "email": "john.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-02-14",
+        }
+        self.payload_user_other = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "username": "jdoe2",
+            "email": "jane.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1993-01-21",
+        }
+        self.payload_login = {
+            "username": "jdoe",
+            "password": "secret",
+        }
+        self.payload_login_other = {
+            "username": "jdoe2",
+            "password": "secret",
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        login = self.client.post(LOGIN_USER_URL, self.payload_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client_other.post(REGISTER_USER_URL, self.payload_user_other)
+        login = self.client_other.post(LOGIN_USER_URL, self.payload_login_other)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_other.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client.post(
+            self.create_content_url, self.payload_content, format="multipart"
+        )
+        self.client_other.post(
+            self.create_content_url, self.payload_content_other, format="multipart"
+        )
+
+    def test_user_can_get_their_content(self):
+        """Test to make sure that user can get their own content"""
+        get = self.client.get(self.create_content_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            get.data[0]["title"], self.payload_content["title"]  # type: ignore
+        )
+
+    def test_user_cant_get_other_content(self):
+        """Test to make sure user isn't geting someone elses content"""
+        get = self.client_other.get(self.create_content_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_200_OK)  # type: ignore
+        self.assertNotEqual(
+            get.data[0]["title"], self.payload_content["title"]  # type: ignore
+        )
