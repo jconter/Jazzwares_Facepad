@@ -29,3 +29,14 @@ class Comment(models.Model):
     text = models.CharField(max_length=150)
     created_date = models.DateField(default=date.today)
     parent_comment = models.ManyToManyField("self", blank=True)
+
+
+class Rating(models.Model):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="ratings"
+    )
+    content = models.ForeignKey(
+        Content, on_delete=models.CASCADE, related_name="ratings"
+    )
+    value = models.IntegerField()
+    created_date = models.DateField(default=date.today)
