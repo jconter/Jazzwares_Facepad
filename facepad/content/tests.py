@@ -621,15 +621,28 @@ class RatingAPITests(TestCase):
             post.data["value"], int(self.payload_rating["value"])  # type: ignore
         )
 
-    def test_create_rating_selfcontent_fails(self):
+    def test_create_rating_selfcontent_passes(self):
         """Make sure a user cannot create a rating on their own content"""
         create_rating_url = reverse(
             "content:ratings", kwargs={"content": self.payload_content["title"]}
         )
         post = self.client.post(create_rating_url, self.payload_rating, format="json")
-        self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(post.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            post.data["value"], int(self.payload_rating["value"])  # type: ignore
+        )
 
     def test_create_rating_value_high_fails(self):
+        """Make sure user cannot make a rating that is higher than the limit"""
+        create_rating_url = reverse(
+            "content:ratings", kwargs={"content": self.payload_content_friend["title"]}
+        )
+        post = self.client.post(
+            create_rating_url, self.payload_rating_oob, format="json"
+        )
+        self.assertEqual(post.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_rating_value_low_fails(self):
         """Make sure user cannot make a rating that is higher than the limit"""
         create_rating_url = reverse(
             "content:ratings", kwargs={"content": self.payload_content_friend["title"]}
@@ -645,3 +658,36 @@ class RatingAPITests(TestCase):
         )
         post = self.client.post(create_rating_url, self.payload_rating, format="json")
         self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_get_rating_self_content_successfull(self):
+        """Make sure you can get the ratings of your own content"""
+        get_rating_url = reverse(
+            "content:ratings", kwargs={"content": self.payload_content["title"]}
+        )
+        self.client.post(get_rating_url, self.payload_rating, format="json")
+        get = self.client.get(get_rating_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            get.data[0]["value"], int(self.payload_rating["value"])  # type: ignore
+        )
+
+    def test_get_rating_friend_content_successfull(self):
+        """Make sure you can get the ratings of your friends content"""
+        get_rating_url = reverse(
+            "content:ratings", kwargs={"content": self.payload_content_friend["title"]}
+        )
+        self.client.post(get_rating_url, self.payload_rating, format="json")
+        get = self.client.get(get_rating_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            get.data[0]["value"], int(self.payload_rating["value"])  # type: ignore
+        )
+
+    def test_get_rating_nonselforfriend_content_fails(self):
+        """Make sure you cannot get the ratings of non friends or yourself content"""
+        get_rating_url = reverse(
+            "content:ratings", kwargs={"content": self.payload_content_other["title"]}
+        )
+        self.client.post(get_rating_url, self.payload_rating, format="json")
+        get = self.client.get(get_rating_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_401_UNAUTHORIZED)
