@@ -11,7 +11,7 @@ class Content(models.Model):
     """Model for the content that will be uploaded to tha application"""
 
     media = models.FileField(upload_to="content/%Y/%m/%d/")
-    title = models.CharField(max_length=150)
+    title = models.CharField(max_length=150, unique=True)
     description = models.TextField()
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="owner"

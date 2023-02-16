@@ -5,5 +5,5 @@ from .views import CreateContentView
 app_name = "content"
 
 urlpatterns = [
-    path("content/create/", CreateContentView.as_view(), name="create"),
+    path("content/create/", CreateContentView.as_view(), name="content"),
 ]
