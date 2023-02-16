@@ -145,3 +145,142 @@ class ContentGetAPITest(TestCase):
         self.assertNotEqual(
             get.data[0]["title"], self.payload_content["title"]  # type: ignore
         )
+
+
+class ContentGetFriendAPITest(TestCase):
+    """Testing to Get method for the Friend Content endpoint"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client_friend = APIClient()
+        self.client_other = APIClient()
+        self.create_content_url = reverse("content:content")
+        self.tmpfile = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile.name)
+        self.tmpfile2 = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile2.name)
+        self.tmpfile3 = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile3.name)
+        self.payload_content = {
+            "media": self.tmpfile,
+            "title": "Super Cool Title",
+            "description": "This is the best description in the world!",
+        }
+        self.payload_content_friend = {
+            "media": self.tmpfile2,
+            "title": "Super Cool Second Title",
+            "description": "This is the best description in the world dang!",
+        }
+        self.payload_content_other = {
+            "media": self.tmpfile3,
+            "title": "Super Cool Third Title",
+            "description": "This is the best description in the world gwow!",
+        }
+        self.payload_user = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "jdoe",
+            "email": "john.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-02-14",
+        }
+        self.payload_friend = {
+            "first_name": "Best",
+            "last_name": "Friend",
+            "username": "bfriend",
+            "email": "best.friend@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-07-14",
+        }
+        self.payload_user_other = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "username": "jdoe2",
+            "email": "jane.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1993-01-21",
+        }
+        self.payload_login = {
+            "username": "jdoe",
+            "password": "secret",
+        }
+        self.payload_login_friend = {
+            "username": "bfriend",
+            "password": "secret",
+        }
+        self.payload_login_other = {
+            "username": "jdoe2",
+            "password": "secret",
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        login = self.client.post(LOGIN_USER_URL, self.payload_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client_friend.post(REGISTER_USER_URL, self.payload_friend)
+        login = self.client.post(LOGIN_USER_URL, self.payload_login_friend)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_friend.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client_other.post(REGISTER_USER_URL, self.payload_user_other)
+        login = self.client_other.post(LOGIN_USER_URL, self.payload_login_other)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_other.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client.post(
+            self.create_content_url, self.payload_content, format="multipart"
+        )
+        self.client_friend.post(
+            self.create_content_url, self.payload_content_friend, format="multipart"
+        )
+        self.client_other.post(
+            self.create_content_url, self.payload_content_other, format="multipart"
+        )
+        user = get_user_model().objects.get(username="jdoe")
+        friend = get_user_model().objects.get(username="bfriend")
+        friend.friends.add(user)  # type: ignore
+
+    def test_user_can_get_friends_content(self):
+        """Test to make sure you can get friend's content"""
+        get_friend_content_url = reverse(
+            "content:get_friend",
+            kwargs={"owner": self.payload_friend["username"]},
+        )
+        get = self.client.get(get_friend_content_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            get.data[0]["title"],  # type: ignore
+            self.payload_content_friend["title"],
+        )
+
+    def test_user_get_friend_content_authed(self):
+        """Test to make sure you can get friend's content"""
+        self.client.credentials()  # type: ignore
+        get_friend_content_url = reverse(
+            "content:get_friend",
+            kwargs={"owner": self.payload_friend["username"]},
+        )
+        get = self.client.get(get_friend_content_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_user_cannot_get_non_friend_content(self):
+        """Test to make sure user cannot get non friend data"""
+        get_friend_content_url = reverse(
+            "content:get_friend",
+            kwargs={"owner": self.payload_user_other["username"]},
+        )
+        get = self.client.get(get_friend_content_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_user_can_get_self_content(self):
+        """Test to make sure you can get self content"""
+        get_friend_content_url = reverse(
+            "content:get_friend",
+            kwargs={"owner": self.payload_user["username"]},
+        )
+        get = self.client.get(get_friend_content_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            get.data[0]["title"],  # type: ignore
+            self.payload_content["title"],
+        )
