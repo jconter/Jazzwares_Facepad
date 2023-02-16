@@ -445,7 +445,7 @@ class CommentAPITest(TestCase):
             kwargs={"content": self.payload_content_other["title"]},
         )
         post = self.client.post(create_comment_url, self.payload_comment, format="json")
-        self.assertEqual(post.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_get_comments_selfcontent_works_successfully(self):
         """Test to make sure you can successfully get comments on self posted content"""
@@ -504,4 +504,142 @@ class CommentAPITest(TestCase):
             kwargs={"content": self.payload_content_other["title"]},
         )
         get = self.client.get(get_comment_url, format="json")
-        self.assertEqual(get.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(get.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class RatingAPITests(TestCase):
+    """Test Cases for Ratings API"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client_friend = APIClient()
+        self.client_other = APIClient()
+        self.create_content_url = reverse("content:content")
+        self.tmpfile = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile.name)
+        self.tmpfile2 = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile2.name)
+        self.tmpfile3 = tempfile.NamedTemporaryFile(suffix=".jpg")
+        image = Image.new("RGB", (100, 100))
+        image.save(self.tmpfile3.name)
+        self.payload_content = {
+            "media": self.tmpfile,
+            "title": "Super Cool Title",
+            "description": "This is the best description in the world!",
+        }
+        self.payload_content_friend = {
+            "media": self.tmpfile2,
+            "title": "Super Cool Second Title",
+            "description": "This is the best description in the world dang!",
+        }
+        self.payload_content_other = {
+            "media": self.tmpfile3,
+            "title": "Super Cool Third Title",
+            "description": "This is the best description in the world gwow!",
+        }
+        self.payload_user = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "jdoe",
+            "email": "john.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-02-14",
+        }
+        self.payload_friend = {
+            "first_name": "Best",
+            "last_name": "Friend",
+            "username": "bfriend",
+            "email": "best.friend@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-07-14",
+        }
+        self.payload_user_other = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "username": "jdoe2",
+            "email": "jane.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1993-01-21",
+        }
+        self.payload_login = {
+            "username": "jdoe",
+            "password": "secret",
+        }
+        self.payload_login_friend = {
+            "username": "bfriend",
+            "password": "secret",
+        }
+        self.payload_login_other = {
+            "username": "jdoe2",
+            "password": "secret",
+        }
+        self.payload_rating = {
+            "value": "5",
+        }
+        self.payload_rating_oob = {
+            "rating": "10",
+        }
+        self.payload_rating_low = {
+            "rating": "0",
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        login = self.client.post(LOGIN_USER_URL, self.payload_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client_friend.post(REGISTER_USER_URL, self.payload_friend)
+        login = self.client.post(LOGIN_USER_URL, self.payload_login_friend)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_friend.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client_other.post(REGISTER_USER_URL, self.payload_user_other)
+        login = self.client_other.post(LOGIN_USER_URL, self.payload_login_other)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_other.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.client.post(
+            self.create_content_url, self.payload_content, format="multipart"
+        )
+        self.client_friend.post(
+            self.create_content_url, self.payload_content_friend, format="multipart"
+        )
+        self.client_other.post(
+            self.create_content_url, self.payload_content_other, format="multipart"
+        )
+        user = get_user_model().objects.get(username="jdoe")
+        friend = get_user_model().objects.get(username="bfriend")
+        friend.friends.add(user)  # type: ignore
+        friend.save()
+
+    def test_create_friend_content_rating_successfully(self):
+        """Make sure a user can create a content rating of friend's content successfuly"""
+        create_rating_url = reverse(
+            "content:ratings", kwargs={"content": self.payload_content_friend["title"]}
+        )
+        post = self.client.post(create_rating_url, self.payload_rating, format="json")
+        self.assertEqual(post.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(post.data["value"], int(self.payload_rating["value"]))  # type: ignore
+
+    def test_create_rating_selfcontent_fails(self):
+        """Make sure a user cannot create a rating on their own content"""
+        create_rating_url = reverse(
+            "content:ratings", kwargs={"content": self.payload_content["title"]}
+        )
+        post = self.client.post(create_rating_url, self.payload_rating, format="json")
+        self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_rating_value_high_fails(self):
+        """Make sure user cannot make a rating that is higher than the limit"""
+        create_rating_url = reverse(
+            "content:ratings", kwargs={"content": self.payload_content_friend["title"]}
+        )
+        post = self.client.post(
+            create_rating_url, self.payload_rating_low, format="json"
+        )
+        self.assertEqual(post.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_rating_rate_nonfriend_fails(self):
+        create_rating_url = reverse(
+            "content:ratings", kwargs={"content": self.payload_content_other["title"]}
+        )
+        post = self.client.post(create_rating_url, self.payload_rating, format="json")
+        self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)

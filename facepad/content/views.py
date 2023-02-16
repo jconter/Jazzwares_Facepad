@@ -1,5 +1,5 @@
-from content.models import Comment, Content
-from content.serializers import CommentSerializer, ContentSerializer
+from content.models import Comment, Content, Rating
+from content.serializers import CommentSerializer, ContentSerializer, RatingSerializer
 from django.contrib.auth import get_user_model
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
@@ -52,7 +52,7 @@ class GetFriendContentView(generics.ListAPIView):
             )
 
 
-class CreateCommentView(generics.ListCreateAPIView):
+class CreateListCommentView(generics.ListCreateAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated]
@@ -86,7 +86,7 @@ class CreateCommentView(generics.ListCreateAPIView):
         not_friend = self.request.user not in content_owner.friends.all()  # type: ignore
         not_self = self.request.user != content_owner
         if not_friend and not_self:
-            return Response(status=status.HTTP_403_FORBIDDEN)
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
         else:
             return super().post(request, *args, **kwargs)
 
@@ -97,6 +97,28 @@ class CreateCommentView(generics.ListCreateAPIView):
         not_admin = request.user.user_type != "admin"
         not_self = self.request.user != content_owner
         if not_friend and not_self and not_admin:
-            return Response(status=status.HTTP_403_FORBIDDEN)
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
         else:
             return super().list(request, *args, **kwargs)
+
+
+class CreateListRatingsAPIView(generics.ListCreateAPIView):
+    queryset = Rating.objects.all()
+    serializer_class = RatingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        content = Content.objects.get(title=self.kwargs.get("content"))
+        serializer.save(
+            owner=self.request.user,
+            content=content,
+        )
+
+    def post(self, request, *args, **kwargs):
+        content = Content.objects.get(title=self.kwargs.get("content"))
+        content_owner = get_user_model().objects.get(id=content.owner.id)
+        not_friend = self.request.user not in content_owner.friends.all()  # type: ignore
+        if not_friend:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        else:
+            return super().post(request, *args, **kwargs)
