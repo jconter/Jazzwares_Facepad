@@ -34,4 +34,9 @@ Please see documentation for how to install these on your local machine
 
 ## Notes
 
-This is a dev copy of the app not at all production ready
+WIP
+This is a dev copy of the app not at all production ready.
+
+- I would add CI to run tests on every push
+- I would run with gunicorn in docker
+- I would make alot more changes for it to be production ready.
