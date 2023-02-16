@@ -52,10 +52,16 @@ class GetFriendContentView(generics.ListAPIView):
             )
 
 
-class CreateCommentView(generics.CreateAPIView):
+class CreateCommentView(generics.ListCreateAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        self.queryset = Comment.objects.filter(
+            content__title=self.kwargs.get("content")
+        )
+        return super().get_queryset()
 
     def perform_create(self, serializer):
         content = Content.objects.get(title=self.kwargs.get("content"))
@@ -73,3 +79,24 @@ class CreateCommentView(generics.CreateAPIView):
                 owner=self.request.user,
                 content=content,
             )
+
+    def post(self, request, *args, **kwargs):
+        content = Content.objects.get(title=self.kwargs.get("content"))
+        content_owner = get_user_model().objects.get(id=content.owner.id)
+        not_friend = self.request.user not in content_owner.friends.all()  # type: ignore
+        not_self = self.request.user != content_owner
+        if not_friend and not_self:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        else:
+            return super().post(request, *args, **kwargs)
+
+    def list(self, request, *args, **kwargs):
+        content = Content.objects.get(title=self.kwargs.get("content"))
+        content_owner = get_user_model().objects.get(id=content.owner.id)
+        not_friend = self.request.user not in content_owner.friends.all()  # type: ignore
+        not_admin = request.user.user_type != "admin"
+        not_self = self.request.user != content_owner
+        if not_friend and not_self and not_admin:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        else:
+            return super().list(request, *args, **kwargs)
