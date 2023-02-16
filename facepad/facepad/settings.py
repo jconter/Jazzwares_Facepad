@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "users",
+    "content",
 ]
 
 MIDDLEWARE = [
@@ -126,6 +128,8 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+MEDIA_URL = "media/"
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
@@ -143,3 +147,10 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
 }
+
+
+if "test" in sys.argv:
+    # store files in memory, no cleanup after tests are finished
+    DEFAULT_FILE_STORAGE = "inmemorystorage.InMemoryStorage"
+    # much faster password hashing, default one is super slow (on purpose)
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
