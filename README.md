@@ -1,6 +1,6 @@
 # Jazzwares_Facepad
 
-Take home test for Jasswares.
+Take home test for Jazzwares.
 
 ## Requirements
 
