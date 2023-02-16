@@ -286,7 +286,7 @@ class ContentGetFriendAPITest(TestCase):
         )
 
 
-class CreateNewCommentTest(TestCase):
+class CommentAPITest(TestCase):
     """Test Case to test the Create New Comment Endpoint"""
 
     def setUp(self):
@@ -384,12 +384,24 @@ class CreateNewCommentTest(TestCase):
         user = get_user_model().objects.get(username="jdoe")
         friend = get_user_model().objects.get(username="bfriend")
         friend.friends.add(user)  # type: ignore
+        friend.save()
 
     def test_create_comment_successfully(self):
         """Make sure that a user can create a successful comment on a piece
         of conent"""
         create_comment_url = reverse(
-            "content:create_comment", kwargs={"content": self.payload_content["title"]}
+            "content:content_comment", kwargs={"content": self.payload_content["title"]}
+        )
+        post = self.client.post(create_comment_url, self.payload_comment, format="json")
+        self.assertEqual(post.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(post.data["text"], self.payload_comment["text"])  # type: ignore
+
+    def test_create_friendcomment_successfully(self):
+        """Make sure that a user can create a successful comment on a friend's piece
+        of conent"""
+        create_comment_url = reverse(
+            "content:content_comment",
+            kwargs={"content": self.payload_content_friend["title"]},
         )
         post = self.client.post(create_comment_url, self.payload_comment, format="json")
         self.assertEqual(post.status_code, status.HTTP_201_CREATED)
@@ -399,7 +411,7 @@ class CreateNewCommentTest(TestCase):
         """Make sure user is authed when making comment"""
         self.client.credentials()  # type: ignore
         create_comment_url = reverse(
-            "content:create_comment", kwargs={"content": self.payload_content["title"]}
+            "content:content_comment", kwargs={"content": self.payload_content["title"]}
         )
         post = self.client.post(create_comment_url, self.payload_comment, format="json")
         self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -407,11 +419,11 @@ class CreateNewCommentTest(TestCase):
     def test_create_comment_on_comment_successfully(self):
         """Make sure that you can successfully create a comment of a comment"""
         create_comment_url = reverse(
-            "content:create_comment", kwargs={"content": self.payload_content["title"]}
+            "content:content_comment", kwargs={"content": self.payload_content["title"]}
         )
         post = self.client.post(create_comment_url, self.payload_comment, format="json")
         create_comment_of_comment_url = reverse(
-            "content:create_comment_comment",
+            "content:content_comment_comment",
             kwargs={
                 "content": self.payload_content["title"],
                 "parent_comment": str(post.data["id"]),  # type: ignore
@@ -425,3 +437,71 @@ class CreateNewCommentTest(TestCase):
             post2.data["text"], self.payload_comment_comment["text"]  # type: ignore
         )
         self.assertEqual(post2.data["parent_comment"][0], post.data["id"])  # type: ignore
+
+    def test_create_comment_on_notselforfriend_fail(self):
+        """Make sure you can't post a comment on someone who is not your friend"""
+        create_comment_url = reverse(
+            "content:content_comment",
+            kwargs={"content": self.payload_content_other["title"]},
+        )
+        post = self.client.post(create_comment_url, self.payload_comment, format="json")
+        self.assertEqual(post.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_get_comments_selfcontent_works_successfully(self):
+        """Test to make sure you can successfully get comments on self posted content"""
+        create_comment_url = reverse(
+            "content:content_comment", kwargs={"content": self.payload_content["title"]}
+        )
+        self.client.post(create_comment_url, self.payload_comment, format="json")
+        get_comment_url = reverse(
+            "content:content_comment",
+            kwargs={"content": self.payload_content["title"]},
+        )
+        get = self.client.get(get_comment_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_200_OK)
+        self.assertEqual(get.data[0]["text"], self.payload_comment["text"])  # type: ignore
+
+    def test_get_comments_friendcontent_works_successfully(self):
+        """Test to make sure you can successfully get friend's content comments"""
+        create_comment_url = reverse(
+            "content:content_comment",
+            kwargs={"content": self.payload_content_friend["title"]},
+        )
+        self.client.post(create_comment_url, self.payload_comment, format="json")
+        get_comment_url = reverse(
+            "content:content_comment",
+            kwargs={"content": self.payload_content_friend["title"]},
+        )
+        get = self.client.get(get_comment_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_200_OK)
+        self.assertEqual(get.data[0]["text"], self.payload_comment["text"])  # type: ignore
+
+    def test_get_comments_friendcontent_auth_fails(self):
+        """Test to make sure you can't get comments if you are not authed"""
+        self.client.credentials()  # type: ignore
+        create_comment_url = reverse(
+            "content:content_comment",
+            kwargs={"content": self.payload_content_friend["title"]},
+        )
+        self.client.post(create_comment_url, self.payload_comment, format="json")
+        get_comment_url = reverse(
+            "content:content_comment",
+            kwargs={"content": self.payload_content_friend["title"]},
+        )
+        get = self.client.get(get_comment_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_get_comments_othercontent_fails(self):
+        """Test to make sure you can't get comments from content
+        whose owner is not in your friend group"""
+        create_comment_url = reverse(
+            "content:content_comment",
+            kwargs={"content": self.payload_content_other["title"]},
+        )
+        self.client.post(create_comment_url, self.payload_comment, format="json")
+        get_comment_url = reverse(
+            "content:content_comment",
+            kwargs={"content": self.payload_content_other["title"]},
+        )
+        get = self.client.get(get_comment_url, format="json")
+        self.assertEqual(get.status_code, status.HTTP_403_FORBIDDEN)
