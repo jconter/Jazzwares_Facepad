@@ -617,7 +617,9 @@ class RatingAPITests(TestCase):
         )
         post = self.client.post(create_rating_url, self.payload_rating, format="json")
         self.assertEqual(post.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(post.data["value"], int(self.payload_rating["value"]))  # type: ignore
+        self.assertEqual(
+            post.data["value"], int(self.payload_rating["value"])  # type: ignore
+        )
 
     def test_create_rating_selfcontent_fails(self):
         """Make sure a user cannot create a rating on their own content"""

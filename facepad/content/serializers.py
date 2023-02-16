@@ -1,6 +1,5 @@
 from content.models import Comment, Content, Rating
 from rest_framework import serializers
-from rest_framework.validators import UniqueTogetherValidator
 
 
 class ContentSerializer(serializers.ModelSerializer):
