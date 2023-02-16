@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .views import GetFriendRequests, RegisterView, RequestFriend
+from .views import FriendRequestResponse, GetFriendRequests, RegisterView, RequestFriend
 
 app_name = "users"
 
@@ -11,4 +11,9 @@ urlpatterns = [
     path("auth/token-refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("friends/friend-request/", RequestFriend.as_view(), name="request_friend"),
     path("friends/requests/", GetFriendRequests.as_view(), name="get_friend_requests"),
+    path(
+        "friends/request/response/<int:pk>",
+        FriendRequestResponse.as_view(),
+        name="respond_to_friend_request",
+    ),
 ]

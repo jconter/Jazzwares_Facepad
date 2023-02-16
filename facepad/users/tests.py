@@ -257,3 +257,89 @@ class GetFriendRequestsTest(TestCase):
         self.assertEqual(
             friend_requests.status_code, status.HTTP_401_UNAUTHORIZED  # type: ignore
         )
+
+
+class RespondToRequestTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.client_friend = APIClient()
+        self.user_model = get_user_model()
+        self.get_requests_url = reverse("users:get_friend_requests")
+        self.friend_request_respond_url = reverse(
+            "users:respond_to_friend_request", kwargs={"pk": "1"}
+        )
+        self.payload_user = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "jdoe",
+            "email": "john.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-02-14",
+        }
+        self.payload_friend = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "username": "jdoe2",
+            "email": "jane.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1993-02-14",
+        }
+        payload_login = {
+            "username": "jdoe",
+            "password": "secret",
+        }
+        payload_friend_login = {
+            "username": "jdoe2",
+            "password": "secret",
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        self.client.post(REGISTER_USER_URL, self.payload_friend)
+        login = self.client.post(LOGIN_USER_URL, payload_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.friend_request_url = reverse("users:request_friend")
+        payload = {"requestee": "jdoe2", "requestor": ""}
+        self.client.post(self.friend_request_url, payload)
+        login = self.client_friend.post(LOGIN_USER_URL, payload_friend_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_friend.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+
+    def test_request_response_can_change_status(self):
+        """Testing to see if the user can change the status
+        by responding with a rejection"""
+        payload = {"status": "rejected"}
+        put = self.client_friend.put(
+            self.friend_request_respond_url, payload, format="json"
+        )
+        request = FriendRequest.objects.get(id=1)
+        self.assertEqual(request.status, payload["status"])
+        self.assertEqual(put.status_code, status.HTTP_200_OK)  # type: ignore
+
+    def test_request_response_authenticated(self):
+        """Making sure that user can only use endpoint if authenticated"""
+        self.client_friend.credentials()
+        payload = {"status": "rejected"}
+        put = self.client_friend.put(
+            self.friend_request_respond_url, payload, format="json"
+        )
+        self.assertEqual(put.status_code, status.HTTP_401_UNAUTHORIZED)  # type: ignore
+
+    def test_request_response_can_accept_add_friends(self):
+        """Making sure that the request response endpoint can change
+        the status to accepted and add requested user to friends
+        """
+        payload = {"status": "accepted"}
+        put = self.client_friend.put(
+            self.friend_request_respond_url, payload, format="json"
+        )
+        friend_request = FriendRequest.objects.get(id=1)
+        user_friend = get_user_model().objects.get(
+            username=self.payload_friend["username"]
+        )
+        user = get_user_model().objects.get(username=self.payload_user["username"])
+        is_user_a_friend_of_user_friend = user in user_friend.friends.all()  # type: ignore
+        is_user_friend_a_friend_of_user = user_friend in user.friends.all()  # type: ignore
+        self.assertEqual(friend_request.status, payload["status"])
+        self.assertEqual(put.status_code, status.HTTP_200_OK)  # type: ignore
+        self.assertTrue(is_user_a_friend_of_user_friend)
+        self.assertTrue(is_user_friend_a_friend_of_user)
