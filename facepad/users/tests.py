@@ -1,14 +1,18 @@
+"""Tests for the users app
+"""
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
+from users.models import FriendRequest
 
-REGISTER_USER_URL = reverse('users:register')
-LOGIN_USER_URL = reverse('users:login')
-REFRESH_TOKEN_URL = reverse('users:token_refresh')
+REGISTER_USER_URL = reverse("users:register")
+LOGIN_USER_URL = reverse("users:login")
+REFRESH_TOKEN_URL = reverse("users:token_refresh")
 
-# Create your tests here.
+
 class UserRegistrationAPITest(TestCase):
     """Test the User Regitration API"""
     
@@ -191,3 +195,207 @@ class GetUserInfo(TestCase):
         
     def test_get_userinfo_notselforfriend(self):
         """Test to make sure user can only get his or his friend's data"""
+        
+
+
+class CreateFriendRequestTest(TestCase):
+    """This is a test case to test the create friend request endpoint"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user_model = get_user_model()
+        self.payload_user = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "jdoe",
+            "email": "john.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-02-14",
+        }
+        self.payload_friend = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "username": "jdoe2",
+            "email": "jane.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1993-02-14",
+        }
+        payload_login = {
+            "username": "jdoe",
+            "password": "secret",
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        self.client.post(REGISTER_USER_URL, self.payload_friend)
+        login = self.client.post(LOGIN_USER_URL, payload_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+
+    def test_create_friend_request_creates_request(self):
+        """Make sure that when you send a friend request it gets created"""
+        friend_request_url = reverse("users:request_friend")
+        payload = {"requestee": "jdoe2", "requestor": ""}
+        self.client.post(friend_request_url, payload)
+        fq_query = FriendRequest.objects.filter(
+            requestor__username=self.payload_user["username"]
+        ).filter(requestee__username=self.payload_friend["username"])
+        self.assertTrue(fq_query.exists())
+
+    def test_create_friend_request_no_multiple_active(self):
+        """Make sure you cannot have two friend requests active at the same time"""
+        friend_request_url = reverse("users:request_friend")
+        payload = {"requestee": "jdoe2", "requestor": ""}
+        self.client.post(friend_request_url, payload)
+        post = self.client.post(friend_request_url, payload)
+        self.assertEqual(post.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_friend_request_needs_authentication(self):
+        """Make sure user is authenticated when making request"""
+        self.client.credentials()  # type: ignore
+        friend_request_url = reverse("users:request_friend")
+        payload = {"requestee": "jdoe2", "requestor": ""}
+        post = self.client.post(friend_request_url, payload)
+        self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class GetFriendRequestsTest(TestCase):
+    """Testing to make sure get friend requests endpoint works"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client_friend = APIClient()
+        self.user_model = get_user_model()
+        self.get_requests_url = reverse("users:get_friend_requests")
+        self.payload_user = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "jdoe",
+            "email": "john.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-02-14",
+        }
+        self.payload_friend = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "username": "jdoe2",
+            "email": "jane.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1993-02-14",
+        }
+        payload_login = {
+            "username": "jdoe",
+            "password": "secret",
+        }
+        payload_friend_login = {
+            "username": "jdoe2",
+            "password": "secret",
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        self.client.post(REGISTER_USER_URL, self.payload_friend)
+        login = self.client.post(LOGIN_USER_URL, payload_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.friend_request_url = reverse("users:request_friend")
+        payload = {"requestee": "jdoe2", "requestor": ""}
+        self.client.post(self.friend_request_url, payload)
+        login = self.client_friend.post(LOGIN_USER_URL, payload_friend_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_friend.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+
+    def test_get_friend_requests_list(self):
+        friend_requests = self.client_friend.get(self.get_requests_url, format="json")
+        self.assertEqual(
+            friend_requests.status_code, status.HTTP_200_OK  # type: ignore
+        )
+
+    def test_get_friend_requests_list_authenticated(self):
+        self.client_friend.credentials()  # type: ignore
+        friend_requests = self.client_friend.get(self.get_requests_url, format="json")
+        self.assertEqual(
+            friend_requests.status_code, status.HTTP_401_UNAUTHORIZED  # type: ignore
+        )
+
+
+class RespondToRequestTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.client_friend = APIClient()
+        self.user_model = get_user_model()
+        self.get_requests_url = reverse("users:get_friend_requests")
+        self.friend_request_respond_url = reverse(
+            "users:respond_to_friend_request", kwargs={"pk": "1"}
+        )
+        self.payload_user = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "jdoe",
+            "email": "john.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1990-02-14",
+        }
+        self.payload_friend = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "username": "jdoe2",
+            "email": "jane.doe@gmail.com",
+            "password": "secret",
+            "date_of_birth": "1993-02-14",
+        }
+        payload_login = {
+            "username": "jdoe",
+            "password": "secret",
+        }
+        payload_friend_login = {
+            "username": "jdoe2",
+            "password": "secret",
+        }
+        self.client.post(REGISTER_USER_URL, self.payload_user)
+        self.client.post(REGISTER_USER_URL, self.payload_friend)
+        login = self.client.post(LOGIN_USER_URL, payload_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+        self.friend_request_url = reverse("users:request_friend")
+        payload = {"requestee": "jdoe2", "requestor": ""}
+        self.client.post(self.friend_request_url, payload)
+        login = self.client_friend.post(LOGIN_USER_URL, payload_friend_login)
+        self.auth_token = login.data["access"]  # type: ignore
+        self.client_friend.credentials(HTTP_AUTHORIZATION="Bearer " + self.auth_token)
+
+    def test_request_response_can_change_status(self):
+        """Testing to see if the user can change the status
+        by responding with a rejection"""
+        payload = {"status": "rejected"}
+        put = self.client_friend.put(
+            self.friend_request_respond_url, payload, format="json"
+        )
+        request = FriendRequest.objects.get(id=1)
+        self.assertEqual(request.status, payload["status"])
+        self.assertEqual(put.status_code, status.HTTP_200_OK)  # type: ignore
+
+    def test_request_response_authenticated(self):
+        """Making sure that user can only use endpoint if authenticated"""
+        self.client_friend.credentials()
+        payload = {"status": "rejected"}
+        put = self.client_friend.put(
+            self.friend_request_respond_url, payload, format="json"
+        )
+        self.assertEqual(put.status_code, status.HTTP_401_UNAUTHORIZED)  # type: ignore
+
+    def test_request_response_can_accept_add_friends(self):
+        """Making sure that the request response endpoint can change
+        the status to accepted and add requested user to friends
+        """
+        payload = {"status": "accepted"}
+        put = self.client_friend.put(
+            self.friend_request_respond_url, payload, format="json"
+        )
+        friend_request = FriendRequest.objects.get(id=1)
+        user_friend = get_user_model().objects.get(
+            username=self.payload_friend["username"]
+        )
+        user = get_user_model().objects.get(username=self.payload_user["username"])
+        is_user_a_friend_of_user_friend = user in user_friend.friends.all()  # type: ignore
+        is_user_friend_a_friend_of_user = user_friend in user.friends.all()  # type: ignore
+        self.assertEqual(friend_request.status, payload["status"])
+        self.assertEqual(put.status_code, status.HTTP_200_OK)  # type: ignore
+        self.assertTrue(is_user_a_friend_of_user_friend)
+        self.assertTrue(is_user_friend_a_friend_of_user)
