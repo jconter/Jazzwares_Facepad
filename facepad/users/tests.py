@@ -111,7 +111,7 @@ class UserLoginAPITest(TestCase):
         self.assertTrue("access" in refresh.data)  # type: ignore
 
 
-class GetUserInfo(TestCase):
+class GetUserInfoAPITest(TestCase):
     """This is a test case to test the requirements for the user info get endpoint"""
 
     def setUp(self):
@@ -239,7 +239,7 @@ class GetUserInfo(TestCase):
         self.assertEqual(get_user_info.status_code, status.HTTP_404_NOT_FOUND)
 
 
-class CreateFriendRequestTest(TestCase):
+class CreateFriendRequestAPITest(TestCase):
     """This is a test case to test the create friend request endpoint"""
 
     def setUp(self):
@@ -298,7 +298,7 @@ class CreateFriendRequestTest(TestCase):
         self.assertEqual(post.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-class GetFriendRequestsTest(TestCase):
+class GetFriendRequestsAPITest(TestCase):
     """Testing to make sure get friend requests endpoint works"""
 
     def setUp(self):
@@ -356,7 +356,7 @@ class GetFriendRequestsTest(TestCase):
         )
 
 
-class RespondToRequestTest(TestCase):
+class RespondToRequestAPITest(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.client_friend = APIClient()
