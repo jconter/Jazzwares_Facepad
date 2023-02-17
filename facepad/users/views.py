@@ -20,7 +20,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = UserSerializer
 
 
-class GetUserView(generics.RetrieveAPIView):
+class GetUserView(generics.RetrieveUpdateDestroyAPIView):
     """View to get user info"""
 
     permission_classes = [IsAuthenticated]
@@ -39,6 +39,30 @@ class GetUserView(generics.RetrieveAPIView):
             return super().get(request, *args, **kwargs)
         elif desired_user in self.request.user.friends.all():  # type: ignore
             return super().get(request, *args, **kwargs)
+        else:
+            return Response(
+                status=status.HTTP_404_NOT_FOUND, data={"message", "user not found"}
+            )
+
+    def put(self, request, *args, **kwargs):
+        if request.user.user_type == "admin":
+            return super().put(request, *args, **kwargs)
+        else:
+            return Response(
+                status=status.HTTP_404_NOT_FOUND, data={"message", "user not found"}
+            )
+
+    def patch(self, request, *args, **kwargs):
+        if request.user.user_type == "admin":
+            return super().patch(request, *args, **kwargs)
+        else:
+            return Response(
+                status=status.HTTP_404_NOT_FOUND, data={"message", "user not found"}
+            )
+
+    def delete(self, request, *args, **kwargs):
+        if request.user.user_type == "admin":
+            return super().delete(request, *args, **kwargs)
         else:
             return Response(
                 status=status.HTTP_404_NOT_FOUND, data={"message", "user not found"}
