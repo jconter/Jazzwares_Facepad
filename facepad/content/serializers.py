@@ -27,5 +27,5 @@ class RatingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Rating
-        fields = ("owner", "content", "value", "created_date")
+        fields = ("id", "owner", "content", "value", "created_date")
         read_only_fields = ("owner", "content", "created_date")
