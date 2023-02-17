@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-
 from users.models import FriendRequest
 
 
@@ -15,8 +14,10 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "username",
             "password",
+            "user_type",
             "date_of_birth",
         )
+        ready_only_fields = "user_type"
         extra_kwargs = {
             "password": {"write_only": True},
         }
