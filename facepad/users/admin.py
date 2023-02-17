@@ -9,7 +9,7 @@ class CustomUserAdmin(UserAdmin):
     add_form = CustomUserCreationForm
     form = CustomUserChangeForm
     model = User
-    list_display = ["__all__"]
+    list_display = "__all__"
 
 
 admin.site.register(User, UserAdmin)
