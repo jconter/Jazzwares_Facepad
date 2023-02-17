@@ -18,6 +18,14 @@ class User(AbstractUser):
         default="regular",
     )
 
+    def update_user_type(self):
+        if self.is_staff():  # type: ignore
+            self.user_type = "admin"
+
+    def save(self, *args, **kwargs):
+        self.update_user_type
+        super().save(*args, **kwargs)
+
 
 class FriendRequest(models.Model):
     """Friend request model to store friend request data
